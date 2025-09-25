@@ -32,6 +32,14 @@ public class Parser {
                     tokens.add(new Token(TokenType.RBRACE, null));
                     pos++;
                     break;
+                case '[':
+                    tokens.add(new Token(TokenType.LBRACKET, null));
+                    pos++;
+                    break;
+                case ']':
+                    tokens.add(new Token(TokenType.RBRACKET, null));
+                    pos++;
+                    break;
                 case ':':
                     tokens.add(new Token(TokenType.COLON, null));
                     pos++;
@@ -43,13 +51,66 @@ public class Parser {
                 case '"':
                     tokens.add(new Token(TokenType.STRING, readString()));
                     break;
+                case 't':
+                    tokens.add(new Token(TokenType.TRUE, readLiteral("true")));
+                    break;
+                case 'f':
+                    tokens.add(new Token(TokenType.FALSE, readLiteral("false")));
+                    break;
+                case 'n':
+                    tokens.add(new Token(TokenType.NULL, readLiteral("null")));
+                    break;
                 default:
-                    throw new RuntimeException("Unexpected character: " + ch);
+                    if(Character.isDigit(ch) || ch == '-') {
+                        tokens.add(new Token(TokenType.NUMBER, readNumber()));
+                    } else {
+                        throw new RuntimeException("Unexpected character: " + ch);
+                    }
             }
         }
 
         tokens.add(new Token(TokenType.EOF, null));
         return tokens;
+    }
+
+    private String readNumber() {
+        int start = pos;
+
+        if(input.charAt(pos) == '-') pos++;
+
+        while(pos < input.length() && Character.isDigit(input.charAt(pos))) {
+            pos++;
+        }
+
+        // Fractional Part
+        if(pos < input.length() && input.charAt(pos) == '.') {
+            pos++;
+            while (pos < input.length() && Character.isDigit(input.charAt(pos))) {
+                pos++;
+            }
+        }
+
+        // Exponent Part
+        if(pos < input.length() && (input.charAt(pos) == 'e' || input.charAt(pos) == 'E')) {
+            pos++;
+            if(pos < input.length() && (input.charAt(pos) == '+' || input.charAt(pos) == '-')) {
+                pos++;
+            }
+            while (pos < input.length() && Character.isDigit(input.charAt(pos))) {
+                pos++;
+            }
+        }
+
+        return input.substring(start, pos);
+    }
+
+    private String readLiteral(String expected) {
+        if (input.startsWith(expected, pos)) {
+            pos += expected.length();
+        } else {
+            throw new RuntimeException("Unexpected character: " + input.charAt(pos));
+        }
+        return expected;
     }
 
     private String readString() {
@@ -94,7 +155,31 @@ public class Parser {
     private void parsePair() {
         expect(TokenType.STRING);
         expect(TokenType.COLON);
-        expect(TokenType.STRING);
+        parseValue();
+    }
+
+    private void parseValue() {
+        if (match(TokenType.STRING)) return;
+        if (match(TokenType.NUMBER)) return;
+        if (match(TokenType.TRUE)) return;
+        if (match(TokenType.FALSE)) return;
+        if (match(TokenType.NULL)) return;
+        if (check(TokenType.LBRACE)) { parseObject(); return; }
+        if (check(TokenType.LBRACKET)) { parseArray(); return; }
+        throw new RuntimeException("Unexpected token in value: " + peek().type);
+    }
+
+    private void parseArray() {
+        expect(TokenType.LBRACKET);
+
+        if(!check(TokenType.RBRACKET)) {
+            parseValue();
+            while (match(TokenType.COMMA)) {
+                parseValue();
+            }
+        }
+
+        expect(TokenType.RBRACKET);
     }
 
     private Token advance() {
